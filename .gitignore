@@ -1,0 +1,13 @@
+
+.idea
+.vscode
+.project
+.pydevproject
+
+__pycache__/
+*.pyc
+*.egg-info/
+*.egg
+.cache
+
+.DS_Store

@@ -1,0 +1,14 @@
+[FORMAT]
+max-line-length = 120
+# black generates some bad-continuations
+disable = misplaced-comparison-constant,bad-continuation,invalid-name
+good-names = a,b,c,fn,x,xs,y,ys
+variable-rgx = _|[a-zA-Z][a-z0-9_]{0,30}$
+ignored-modules = tensorflow
+
+[DESIGN]
+max-args = 12
+max-locals = 20
+
+[LOGGING]
+logging-format-style = new

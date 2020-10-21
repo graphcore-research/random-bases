@@ -1,0 +1,212 @@
+name: random_bases
++:
+  - img:  # standard image classification code (see vendor/img)
+mixins:
+  - mixins.random_base:
+      base:
+        # normal, uniform, bernoulli-0.5 etc
+        distribution: normal
+        # if the dimensionality is large, it can save memory to compute the random projection in batches
+        #  of a smaller size. The parameter is only considered in mode=optimized
+        # the higher the faster, the lower the more memory saved
+        batching: 50
+        # matrix, loop, optimized
+        mode: optimized
+        normalized: False
+      ~uniform:
+        base:
+          distribution: uniform
+      ~bernoulli:
+        base:
+          distribution: bernoulli
+components:models:
+  # Baseline image model
+  - +.img.models.image=image:
+      ~mnist:
+        data:
+          dataset:
+            name: mnist
+      ~fmnist:
+        data:
+          dataset:
+            name: fashion_mnist
+      ~cifar10:
+        data:
+          dataset:
+            name: cifar10
+      # disable momentum and learning rate schedule by default
+      momentum: 0.0
+      learning_rate_schedule:
+        type:
+      # enable data augmentation
+      data:
+        preprocessing:
+          augmentation: True
+      ~fc:
+        network: dense
+        ~fmnist:
+          learning_rate: base_learning_rate(2**-7)
+        ~mnist:
+          learning_rate: base_learning_rate(2**-8)
+        ~cifar10:
+          learning_rate: base_learning_rate(2**-12)
+      ~cnn:
+        network: base_conv
+        ~fmnist:
+          learning_rate: base_learning_rate(2**-9)
+        ~mnist:
+          learning_rate: base_learning_rate(2**-10)
+        ~cifar10:
+          learning_rate: base_learning_rate(2**-11)
+  # Random bases descent
+  - rbd^+.img.models.image:
+      _mixins_:
+        - name: ipu
+          vendor: img
+        - name: image_data
+          vendor: img
+        - name: image_network
+          vendor: img
+        - random_base
+      n:
+      data:
+        batch_size: 32
+        preprocessing:
+          augmentation: True
+      momentum: 0.0
+      learning_rate_schedule:
+        type:
+      # --- use of hardware accelerator (CPU/IPU)
+      ipu.enabled: True                     # change to False to run on CPUs
+      workers: 1                            # to use multiple accelerators (data-parallel training)
+      use_sharding: False                   # if True or N:int > 1, model will be split over N shards (model-parallel training)
+      # --- general settings
+      epochs: 160
+      stop_on_nan: True
+      base_dimensions: 250
+      same_images_for_each_worker: False    # if True, workers see the same mini-batch at every step
+      base_for_each_worker: True            # if False, all workers use the same random bases vectors
+      average_in_coordinate_space: False    # if True, worker gradients will be averaged in subspace
+      weights_per_compartment: 1e10         # maximum number of weights in each compartment. If -1, layers boundaries will be used instead
+      group_weights_by_type: False          # groups compartments by variable type
+      dynamic_compartments: False           # sets a compression factor of the network; compartments will be arranged accordingly
+      dynamic_allocation_mode:
+      split_dimensions_across_compartments: False
+      split_dimensions_across_workers: False
+      coordinate_transformation: False      # Optional coordinate transform that is applied before the update. 'ranks': Rank sorted, 'norm': Normalized, or False to disable (identity transform)
+      reset_coordinates_each_step: True     # If False, coordinates are not reset to 0 after each step
+      reset_base_each_step: True            # If False, same bases vectors are used throughout training
+      continuous_coordinate_update: False   # If True, coordinates are not overwritten during update
+      antithetic_sampling: False            # Enables antithetic sampling as used in evolutionary computing
+      use_top_directions: False             # 1.0 = keep all directions; 0.5 = keep best half, if int uses top-k
+      use_sgd: False                        # use SGD steps instead of the calculated random base gradient
+      use_sgd_for_layer: False              # use SGD for specific layer only. If negative, use SGD in all except the layer
+      sgd_learning_rate: base_learning_rate(2**-13)   # learning rate for standard SGD steps
+      compute_gradient_correlation: True    # If True, computes correlation with SGD gradient
+      correlation_multiplier: False         # If True, updates gets multipled with the correlation with the SGD update
+      surgeon_update: False                 # only updates the weights for which the gradient approximation is higher than given threshold
+      keep_projection_in_memory: False      # do not regenerate but keep random projection in memory
+      skip_update_if_correlation_lower_than: False    # Correlation threshold to use SGD instead of RBD
+      update_schedule:
+        enabled: False
+        mode: sgd_last
+        epochs: 40
+      retrieve_coordinates: True            # If True, coordinate statistics are computed
+      compute_hessian: False                # If True, hessian norm approximation is computed
+      compute_full_hessian: False           # If True, full directional hessian approximation is computed
+      store_hessian: False
+      store_coordinates: False              # Activate to store values in results folder
+      store_correlations: False
+      weight_streaming: False               # If enabled, outfeed current projected weights at every step
+      learning_rate: 0.005
+      compile_test: False                   # If enabled, only a single training iteration is performed to test the setup
+      base_learning:
+        enabled: False                      # If enabled, bases vectors are re-drawn or re-used based on criteria
+        mode: low_magnitude
+        fraction: 0.5                       # fraction of elements considered low and to be re-drawn, 1.0 = all redraw; 0.0 no redraw
+      # --- architecture specific tuned parameters
+      ~mnist:
+        data:
+          dataset:
+            name: mnist
+      ~fmnist:
+        data:
+          dataset:
+            name: fashion_mnist
+      ~cifar10:
+        data:
+          dataset:
+            name: cifar10
+      ~fc:
+        network: dense
+        base:
+          normalized: auto_norm(101770)
+        ~fmnist:
+          learning_rate: base_learning_rate(2**-6)
+          sgd_learning_rate: base_learning_rate(2**-7)
+        ~mnist:
+          learning_rate: base_learning_rate(2**-5)
+          sgd_learning_rate: base_learning_rate(2**-8)
+        ~cifar10:
+          learning_rate: base_learning_rate(2**-7)
+          sgd_learning_rate: base_learning_rate(2**-11)
+          base:
+            batching: 10
+            normalized: auto_norm(394634)
+      ~cnn:
+        network: base_conv
+        base:
+          normalized: auto_norm(93322)
+        ~fmnist:
+          learning_rate: base_learning_rate(2**-8)
+          sgd_learning_rate: base_learning_rate(2**-9)
+        ~mnist:
+          learning_rate: base_learning_rate(2**-9)
+          sgd_learning_rate: base_learning_rate(2**-10)
+        ~cifar10:
+          learning_rate: base_learning_rate(2**-8)
+          sgd_learning_rate: base_learning_rate(2**-11)
+          base:
+            normalized: auto_norm(122570)
+  # Model to plot loss landscape
+  - rbd_landscape^rbd:
+      learning_rate: base_learning_rate(2**-10)
+      bins: 3         # number of samples at different distance from \theta
+      binsize: 0.002  # size of a bin
+      transformation: norm
+  # Random bases descent distributed implementation
+  - rbd_dist^rbd:
+      data:
+        evaluation_batch_size: $self.data.batch_size
+      workers: 2
+  # Use gradient vectors as bases
+  - grad^rbd:
+      compute_gradient_correlation: False
+      epochs: 80
+      offset: False
+      use_update_as_base: False
+      base_dimensions: 1
+      learning_rate: base_learning_rate(2**-8)
+  # Re-implementation of simple natural evolution strategies (http://arxiv.org/abs/1703.03864)
+  - nes^rbd:
+      validation: True
+      reset_base_each_step: True
+      noise_std: 0.01
+      l2coeff: None
+      transformation: ranks
+  # Use forwardpass to determine random bases coordinates.
+  #  There is the subtle difference with standard NES above that all offspring are evaluated on the same mini-batch
+  - rbd_nes^rbd:
+      learning_rate: 1e-5
+      noise_std: 0.002
+      l2coeff: None
+      transformation: ranks
+  # Analysis: Gradient correlation baselines
+  - corr^rbd:
+  # Analysis: Measuring the orthogonality of high-dimensional random bases
+  - ortho:
+      _mixins_:
+        - name: ipu
+          vendor: img
+      iterations: 100
+      dimension: 10

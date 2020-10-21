@@ -1,0 +1,69 @@
+name: img
+mixins:
+  - mixins.ipu:
+      ipu:
+        enabled: True
+        num_ipus: 1
+        device: -1  # -1 for automatic choice
+        xla_on_non_ipu_device: False
+        connectionType:
+        connectionVersion:
+        compilation_options:
+  - mixins.data=image_data:
+      data:
+        dataset:
+          # mnist / fashion_mnist / cifar10 / cifar100
+          name: fashion_mnist
+          as_supervised: True
+          validation_split: True
+          split_seed: None
+          data_dir:
+        shuffle:
+          buffer: 50000
+          each_iteration: True
+          seed:
+        preprocessing:
+          one_hot: False
+          as_tuple: False
+          augmentation: False
+        batch_size: 32
+        evaluation_batch_size: 32
+        drop_remainder: False
+  - mixins.network=image_network:
+      network: dense
+components:models:
+  - image:
+      _mixins_:
+        - ipu
+        - image_data
+        - image_network
+      data:
+        batch_size: 32
+        evaluation_batch_size: 5000
+        preprocessing:
+          one_hot: True
+        drop_remainder: True
+      optimizer:
+        type: SGD
+      momentum: 0.9
+      nesterov: False
+      top_k_acc: 3
+      epochs: 160
+      network: dense
+      learning_rate: base_learning_rate(2**-10)
+      workers: 1  # for data-parallel training
+      learning_rate_warmup:
+        steps: 0
+        mode: linear  # exp or linear
+      learning_rate_schedule:
+        # None, piecewise, cosine_decay, exponential
+        type: cosine_decay
+        # piecewise
+        boundaries: [0.5, 0.75]
+        multipliers: [1.0, 0.1, 0.01]
+        # cosine_decay
+        cosine_decay_steps: 1.0 # * epochs
+        decay_alpha: 0.01 # minimum learning rate value as a fraction of learning_rate
+        # exponential
+        decay_rate: 0.25
+        decay_steps: 1.0  # * epochs
