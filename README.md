@@ -1,6 +1,6 @@
 # Improving Neural Network Training in Low Dimensional Random Bases
 
-This repository is the official implementation of Improving Neural Network Training in Low Dimensional Random Bases. 
+This repository is the official implementation of [Improving Neural Network Training in Low Dimensional Random Bases](https://arxiv.org/abs/2011.04720).
 
 ## Requirements
 
